@@ -13,9 +13,9 @@ type Config struct {
 }
 
 func init() {
-	output := flag.CommandLine.Output()
-
 	flag.Usage = func() {
+		output := flag.CommandLine.Output()
+
 		fmt.Fprintf(output, "Usage: %s [flags] <image>\n", os.Args[0])
 		fmt.Fprintln(
 			output,
