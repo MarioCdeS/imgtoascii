@@ -27,12 +27,10 @@ func init() {
 }
 
 func FromArgs() *Config {
-	outPath := flag.String(
-		"o", "out.txt", "path to output text file (defaults to out.txt)",
-	)
+	outPath := flag.String("o", "out.txt", "path to output text file")
 
 	ramp := Ramp10
-	flag.Var(&ramp, "g", "greyscale ramp to use (10 or 70, defaults to 10)")
+	flag.Var(&ramp, "g", "greyscale ramp to use (10 or 70, default 10)")
 
 	flag.Parse()
 
