@@ -13,7 +13,11 @@ func main() {
 
 	if err := converter.Run(cfg); err != nil {
 		fmt.Fprintln(os.Stderr, "Error:", err)
-		fmt.Fprintln(os.Stderr, "Cause:", err.Cause)
+
+		if err.Cause != nil {
+			fmt.Fprintln(os.Stderr, "Cause:", err.Cause)
+		}
+
 		os.Exit(3)
 	}
 }

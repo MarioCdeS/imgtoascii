@@ -12,7 +12,8 @@
 *.out
 
 # Test images
-test.png
+*.png
+*.jpg
 
 # IntelliJ project files
 .idea/
