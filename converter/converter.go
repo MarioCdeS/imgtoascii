@@ -18,9 +18,6 @@ const (
 	ramp70 = "$@B%8&WM#*oahkbdpqwmZO0QLCJUYXzcvunxrjft/\\|()1{}[]?-_+~<>i!lI;:,\"^`'. "
 )
 
-var ramp10Runes []rune
-var ramp70Runes []rune
-
 type Error struct {
 	Msg   string
 	Cause error
@@ -40,11 +37,6 @@ type internalConfig struct {
 	rowHeight int
 	outRows   int
 	outRamp   []rune
-}
-
-func init() {
-	ramp10Runes = []rune(ramp10)
-	ramp70Runes = []rune(ramp70)
 }
 
 func Run(cfg *config.Config) *Error {
@@ -99,12 +91,12 @@ func calculateInternalConfig(cfg *config.Config, imgBounds image.Rectangle) (*in
 		}
 	}
 
-	var outRamp []rune
+	var outRampStr string
 
 	if cfg.Ramp == config.Ramp10 {
-		outRamp = ramp10Runes
+		outRampStr = ramp10
 	} else {
-		outRamp = ramp70Runes
+		outRampStr = ramp70
 	}
 
 	return &internalConfig{
@@ -112,7 +104,7 @@ func calculateInternalConfig(cfg *config.Config, imgBounds image.Rectangle) (*in
 		colWidth,
 		rowHeight,
 		outRows,
-		outRamp,
+		[]rune(outRampStr),
 	}, nil
 }
 
