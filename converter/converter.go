@@ -3,6 +3,7 @@ package converter
 import (
 	"fmt"
 	"image"
+	"image/color"
 	_ "image/gif"
 	_ "image/jpeg"
 	_ "image/png"
@@ -38,14 +39,10 @@ func (e *Error) Error() string {
 
 type internalConfig struct {
 	*config.Config
-	imgWidth       int
-	imgHeight      int
-	colWidth       int
-	rowHeight      int
-	outRows        int
-	numCPU         int
-	numColsPerCPU  int
-	numColsLastCPU int
+	colWidth  int
+	rowHeight int
+	outRows   int
+	outRamp   []rune
 }
 
 func init() {
@@ -84,7 +81,7 @@ func loadImage(path string) (image.Image, error) {
 }
 
 func calculateInternalConfig(cfg *config.Config, imgBounds image.Rectangle) (*internalConfig, *Error) {
-	imgWidth := imgBounds.Max.X
+	imgWidth := imgBounds.Max.X - imgBounds.Min.X
 
 	if cfg.OutCols > imgWidth {
 		return nil, &Error{
@@ -93,7 +90,7 @@ func calculateInternalConfig(cfg *config.Config, imgBounds image.Rectangle) (*in
 		}
 	}
 
-	imgHeight := imgBounds.Max.Y
+	imgHeight := imgBounds.Max.Y - imgBounds.Min.Y
 	colWidth := imgWidth / cfg.OutCols
 	rowHeight := int(float64(colWidth) * cfg.ColRowRatio)
 	outRows := imgHeight / rowHeight
@@ -105,89 +102,45 @@ func calculateInternalConfig(cfg *config.Config, imgBounds image.Rectangle) (*in
 		}
 	}
 
-	numCPU := 1 // runtime.NumCPU()
-	numColsPerCPU := cfg.OutCols / numCPU
-	numColsLastCPU := cfg.OutCols - (numCPU-1)*numColsPerCPU
+	var outRamp []rune
+
+	if cfg.Ramp == config.Ramp10 {
+		outRamp = ramp10Runes
+	} else {
+		outRamp = ramp70Runes
+	}
 
 	return &internalConfig{
 		cfg,
-		imgWidth,
-		imgHeight,
 		colWidth,
 		rowHeight,
 		outRows,
-		numCPU,
-		numColsPerCPU,
-		numColsLastCPU,
+		outRamp,
 	}, nil
 }
 
 func convertToASCII(img image.Image, cfg *internalConfig) {
-	var ramp []rune
+	line := make([]rune, cfg.OutCols)
 
-	if cfg.Ramp == config.Ramp10 {
-		ramp = ramp10Runes
-	} else {
-		ramp = ramp70Runes
-	}
-
-	segmentWidth := cfg.numColsPerCPU * cfg.colWidth
-	outChannels := make([]chan rune, cfg.numCPU)
-
-	var bounds image.Rectangle
-
-	for i := 0; i < cfg.numCPU-1; i++ {
-		bounds = image.Rect(i*segmentWidth, 0, (i+1)*segmentWidth-1, cfg.imgHeight)
-		outChannels[i] = make(chan rune, cfg.numColsPerCPU)
-		go convertSegmentToASCII(img, bounds, cfg.colWidth, cfg.rowHeight, ramp, outChannels[i])
-	}
-
-	bounds = image.Rect((cfg.numCPU-1)*segmentWidth, 0, cfg.imgWidth, cfg.imgHeight)
-	outChannels[cfg.numCPU-1] = make(chan rune, cfg.numColsLastCPU)
-	go convertSegmentToASCII(img, bounds, cfg.colWidth, cfg.rowHeight, ramp, outChannels[cfg.numCPU-1])
-
-	outputLine := make([]rune, cfg.OutCols)
-
-	for i := 0; i < cfg.outRows; i++ {
-		for j, ch := range outChannels {
-			var stop int
-
-			if j == cfg.numCPU-1 {
-				stop = cfg.numColsLastCPU
-			} else {
-				stop = cfg.numColsPerCPU
-			}
-
-			for k := 0; k < stop; k++ {
-				outputLine[j*cfg.numColsPerCPU+k] = <-ch
-			}
+	for j := 0; j < cfg.outRows; j++ {
+		for i := 0; i < cfg.OutCols; i++ {
+			rect := image.Rect(i*cfg.colWidth, j*cfg.rowHeight, (i+1)*cfg.colWidth, (j+1)*cfg.rowHeight)
+			idx := int(math.Floor((pixelsGrayAverage(img, &rect) / math.MaxUint8) * float64(len(cfg.outRamp)-1)))
+			line[i] = cfg.outRamp[idx]
 		}
 
-		fmt.Println(string(outputLine))
+		fmt.Println(string(line))
 	}
 }
 
-func convertSegmentToASCII(img image.Image, bounds image.Rectangle, colWidth, rowHeight int, ramp []rune, ch chan rune) {
-	numPixPerSeg := uint32(colWidth * rowHeight)
+func pixelsGrayAverage(img image.Image, rect *image.Rectangle) float64 {
+	var total uint
 
-	for y := bounds.Min.Y; y < bounds.Max.Y; y += rowHeight {
-		for x := bounds.Min.X; x < bounds.Max.X; x += colWidth {
-			var totR, totG, totB uint32 = 0, 0, 0
-
-			for i := 0; i < colWidth; i++ {
-				for j := 0; j < rowHeight; j++ {
-					r, g, b, _ := img.At(x+i, y+j).RGBA()
-					totR += r
-					totG += g
-					totB += b
-				}
-			}
-
-			lum := (redWeight*float64(totR/numPixPerSeg) + greenWeight*float64(totG/numPixPerSeg) +
-				blueWeight*float64(totB/numPixPerSeg)) / 65535.0
-			i := int(math.Round(lum * float64(len(ramp))))
-
-			ch <- ramp[i]
+	for x := rect.Min.X; x < rect.Max.X; x++ {
+		for y := rect.Min.Y; y < rect.Max.Y; y++ {
+			total += uint(color.GrayModel.Convert(img.At(x, y)).(color.Gray).Y)
 		}
 	}
+
+	return float64(total) / float64((rect.Max.X-rect.Min.X)*(rect.Max.Y-rect.Min.Y))
 }

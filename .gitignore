@@ -15,6 +15,9 @@
 *.png
 *.jpg
 
+# Test output
+test.txt
+
 # IntelliJ project files
 .idea/
 imgtoascii.iml

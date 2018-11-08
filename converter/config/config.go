@@ -33,7 +33,7 @@ func FromArgs() *Config {
 	colRowRatio := flag.Float64("r", 2.33, "column-to-row ratio")
 
 	ramp := Ramp10
-	flag.Var(&ramp, "g", "greyscale ramp to use (10 or 70, default 10)")
+	flag.Var(&ramp, "g", "grayscale ramp to use (10 or 70, default 10)")
 
 	flag.Parse()
 
