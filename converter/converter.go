@@ -14,11 +14,8 @@ import (
 )
 
 const (
-	ramp10      = " .:-=+*#%@"
-	ramp70      = "$@B%8&WM#*oahkbdpqwmZO0QLCJUYXzcvunxrjft/\\|()1{}[]?-_+~<>i!lI;:,\"^`'. "
-	redWeight   = 0.299
-	greenWeight = 0.587
-	blueWeight  = 0.114
+	ramp10 = " .:-=+*#%@"
+	ramp70 = "$@B%8&WM#*oahkbdpqwmZO0QLCJUYXzcvunxrjft/\\|()1{}[]?-_+~<>i!lI;:,\"^`'. "
 )
 
 var ramp10Runes []rune
@@ -134,13 +131,13 @@ func convertToASCII(img image.Image, cfg *internalConfig) {
 }
 
 func pixelsGrayAverage(img image.Image, rect *image.Rectangle) float64 {
-	var total uint
+	var total float64
 
 	for x := rect.Min.X; x < rect.Max.X; x++ {
 		for y := rect.Min.Y; y < rect.Max.Y; y++ {
-			total += uint(color.GrayModel.Convert(img.At(x, y)).(color.Gray).Y)
+			total += float64(color.GrayModel.Convert(img.At(x, y)).(color.Gray).Y)
 		}
 	}
 
-	return float64(total) / float64((rect.Max.X-rect.Min.X)*(rect.Max.Y-rect.Min.Y))
+	return total / float64((rect.Max.X-rect.Min.X)*(rect.Max.Y-rect.Min.Y))
 }
