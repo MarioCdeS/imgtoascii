@@ -4,13 +4,15 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"path/filepath"
+	"runtime"
 )
 
 type Config struct {
 	ImagePath   string
-	OutPath     string
 	OutCols     int
 	ColRowRatio float64
+	NumCPU      int
 	Ramp
 }
 
@@ -18,17 +20,18 @@ func init() {
 	flag.Usage = func() {
 		output := flag.CommandLine.Output()
 
-		fmt.Fprintf(output, "Usage: %s [flags] <image>\n", os.Args[0])
-		fmt.Fprintln(output, "Image: path to image to convert (GIF, JPG, or PNG)")
+		fmt.Fprintf(output, "Usage: %s [<flag>...] <image>\n", filepath.Base(os.Args[0]))
+		fmt.Fprintln(output, "Image: path to the image to convert (GIF, JPG, or PNG)")
 		fmt.Fprintln(output, "Flags:")
 		flag.PrintDefaults()
 	}
 }
 
 func FromArgs() *Config {
-	outPath := flag.String("o", "out.txt", "path to output text file")
+	outCols := flag.Uint("c", 80, "number of output columns")
 
-	outCols := flag.Int("c", 80, "number of output columns")
+	maxNumCPU := uint(runtime.NumCPU())
+	numCPU := flag.Uint("n", maxNumCPU, "number of CPU cores to use when performing conversion")
 
 	colRowRatio := flag.Float64("r", 2.33, "column-to-row ratio")
 
@@ -36,6 +39,10 @@ func FromArgs() *Config {
 	flag.Var(&ramp, "g", "grayscale ramp to use (10 or 70, default 10)")
 
 	flag.Parse()
+
+	if *numCPU > maxNumCPU {
+		*numCPU = maxNumCPU
+	}
 
 	if flag.NArg() == 0 {
 		fmt.Fprintln(flag.CommandLine.Output(), "no input image specified")
@@ -47,9 +54,9 @@ func FromArgs() *Config {
 
 	return &Config{
 		imagePath,
-		*outPath,
-		*outCols,
+		int(*outCols),
 		*colRowRatio,
+		int(*numCPU),
 		ramp,
 	}
 }

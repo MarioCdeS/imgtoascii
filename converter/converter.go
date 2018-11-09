@@ -14,7 +14,7 @@ import (
 )
 
 const (
-	ramp10 = " .:-=+*#%@"
+	ramp10 = "@%#*+=-:. "
 	ramp70 = "$@B%8&WM#*oahkbdpqwmZO0QLCJUYXzcvunxrjft/\\|()1{}[]?-_+~<>i!lI;:,\"^`'. "
 )
 
@@ -39,21 +39,20 @@ type internalConfig struct {
 	outRamp   []rune
 }
 
-func Run(cfg *config.Config) *Error {
+func Run(cfg *config.Config) ([]string, *Error) {
 	img, errLoad := loadImage(cfg.ImagePath)
 
 	if errLoad != nil {
-		return &Error{"unable to load image", errLoad}
+		return nil, &Error{"unable to load image", errLoad}
 	}
 
 	intCfg, err := calculateInternalConfig(cfg, img.Bounds())
 
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	convertToASCII(img, intCfg)
-	return nil
+	return convertToASCII(img, intCfg), nil
 }
 
 func loadImage(path string) (image.Image, error) {
@@ -108,21 +107,67 @@ func calculateInternalConfig(cfg *config.Config, imgBounds image.Rectangle) (*in
 	}, nil
 }
 
-func convertToASCII(img image.Image, cfg *internalConfig) {
-	line := make([]rune, cfg.OutCols)
+func convertToASCII(img image.Image, cfg *internalConfig) []string {
+	numRowsPerStrip := cfg.outRows / cfg.NumCPU
+	chs := make([]chan string, cfg.NumCPU)
 
-	for j := 0; j < cfg.outRows; j++ {
+	for i := 0; i < cfg.NumCPU; i++ {
+		var numRows int
+
+		if i == cfg.NumCPU-1 {
+			numRows = cfg.outRows - (cfg.NumCPU-1)*numRowsPerStrip
+		} else {
+			numRows = numRowsPerStrip
+		}
+
+		chs[i] = make(chan string, numRowsPerStrip)
+		go convertImgStripToASCII(img, i*numRowsPerStrip*cfg.rowHeight, numRows, cfg, chs[i])
+	}
+
+	ascii := make([]string, cfg.outRows)
+	counts := make([]int, cfg.NumCPU)
+	busy := true
+
+	for busy {
+		busy = false
+
+		for i := 0; i < cfg.NumCPU; i++ {
+			select {
+			case line, ok := <-chs[i]:
+				if ok {
+					ascii[i*numRowsPerStrip+counts[i]] = line
+					counts[i]++
+					busy = true
+				}
+			default:
+				busy = true
+			}
+		}
+	}
+
+	return ascii
+}
+
+func convertImgStripToASCII(img image.Image, minY int, numRows int, cfg *internalConfig, ch chan<- string) {
+	defer close(ch)
+
+	line := make([]rune, cfg.OutCols)
+	minX := img.Bounds().Min.X
+
+	for j := 0; j < numRows; j++ {
 		for i := 0; i < cfg.OutCols; i++ {
-			rect := image.Rect(i*cfg.colWidth, j*cfg.rowHeight, (i+1)*cfg.colWidth, (j+1)*cfg.rowHeight)
-			idx := int(math.Floor((pixelsGrayAverage(img, &rect) / math.MaxUint8) * float64(len(cfg.outRamp)-1)))
+			charMinX := minX + i*cfg.colWidth
+			charMinY := minY + j*cfg.rowHeight
+			charRect := image.Rect(charMinX, charMinY, charMinX+cfg.colWidth, charMinY+cfg.rowHeight)
+			idx := int(math.Floor((rectGrayAverage(img, &charRect) / math.MaxUint8) * float64(len(cfg.outRamp)-1)))
 			line[i] = cfg.outRamp[idx]
 		}
 
-		fmt.Println(string(line))
+		ch <- string(line)
 	}
 }
 
-func pixelsGrayAverage(img image.Image, rect *image.Rectangle) float64 {
+func rectGrayAverage(img image.Image, rect *image.Rectangle) float64 {
 	var total float64
 
 	for x := rect.Min.X; x < rect.Max.X; x++ {

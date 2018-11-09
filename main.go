@@ -10,8 +10,9 @@ import (
 
 func main() {
 	cfg := config.FromArgs()
+	ascii, err := converter.Run(cfg)
 
-	if err := converter.Run(cfg); err != nil {
+	if err != nil {
 		fmt.Fprintln(os.Stderr, "Error:", err)
 
 		if err.Cause != nil {
@@ -19,5 +20,9 @@ func main() {
 		}
 
 		os.Exit(3)
+	}
+
+	for _, line := range ascii {
+		fmt.Println(line)
 	}
 }
