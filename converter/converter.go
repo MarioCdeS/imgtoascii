@@ -132,14 +132,9 @@ func convertToASCII(img image.Image, cfg *internalConfig) []string {
 		busy = false
 
 		for i := 0; i < cfg.NumCPU; i++ {
-			select {
-			case line, ok := <-chs[i]:
-				if ok {
-					ascii[i*numRowsPerStrip+counts[i]] = line
-					counts[i]++
-					busy = true
-				}
-			default:
+			if line, ok := <-chs[i]; ok {
+				ascii[i*numRowsPerStrip+counts[i]] = line
+				counts[i]++
 				busy = true
 			}
 		}
