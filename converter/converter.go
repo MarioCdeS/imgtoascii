@@ -120,7 +120,7 @@ func convertToASCII(img image.Image, cfg *internalConfig) []string {
 			numRows = numRowsPerStrip
 		}
 
-		chs[i] = make(chan string, numRowsPerStrip)
+		chs[i] = make(chan string, numRows)
 		go convertImgStripToASCII(img, i*numRowsPerStrip*cfg.rowHeight, numRows, cfg, chs[i])
 	}
 
